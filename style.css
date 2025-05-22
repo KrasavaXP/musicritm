@@ -1,0 +1,124 @@
+body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    margin: 0;
+}
+
+#game-container {
+    width: 800px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+    text-align: center;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #eee;
+    border-radius: 5px;
+}
+
+#score-section, #multiplier-section {
+    font-size: 1.2em;
+    font-weight: bold;
+}
+
+#score {
+    color: #4CAF50;
+}
+
+#multiplier {
+    color: #FFC107;
+}
+
+#music-selection, #instrument-selection {
+    margin-bottom: 20px;
+}
+
+#music-selection label, #instrument-selection label {
+    margin-right: 10px;
+}
+
+#music-file, #instrument-select {
+    padding: 8px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
+}
+
+#visual-tracks {
+    display: flex;
+    justify-content: space-around;
+    height: 400px; /* Adjust as needed */
+    border: 2px solid #333;
+    border-radius: 5px;
+    padding: 10px;
+    background-color: #ddd;
+}
+
+.track {
+    width: 100px; /* Adjust as needed */
+    background-color: #555;
+    border-radius: 5px;
+    margin: 0 5px;
+    position: relative; /* For positioning notes */
+    overflow: hidden; /* To hide notes overflowing */
+}
+
+/* Styling for each track to be visually distinct */
+#track-1 { background-color: #ff7675; } /* Light Red */
+#track-2 { background-color: #74b9ff; } /* Light Blue */
+#track-3 { background-color: #55efc4; } /* Light Green */
+#track-4 { background-color: #ffeaa7; } /* Light Yellow */
+
+/* Placeholder styling for notes */
+.note {
+    width: 80%;
+    height: 30px; /* Adjust as needed */
+    background-color: #333;
+    border: 2px solid #fff;
+    border-radius: 5px;
+    position: absolute;
+    /* bottom: 10px; */ /* Controlled by JS or default top:0 */
+    left: 10%;
+    /* animation: fall 5s linear infinite; */ /* Animation is handled by JS */
+}
+
+/* Example animation for falling notes - This is not used by default, JS handles animation */
+/* @keyframes fall {
+    0% { transform: translateY(0); }
+    100% { transform: translateY(-400px); } /* Adjust to track height */
+/* } */
+
+/* Basic styling for key press feedback */
+.track.active {
+    box-shadow: 0 0 15px 5px #fff; /* Highlight effect */
+    transform: scale(1.05); /* Slightly larger */
+    transition: box-shadow 0.1s ease-out, transform 0.1s ease-out;
+}
+
+.track.hit {
+    background-color: #fff; /* Flash white on hit */
+    transition: background-color 0.05s ease-out;
+}
+
+/* Styling for when a note is successfully hit */
+.note.hit-animation {
+    opacity: 0;
+    transform: scale(1.5);
+    transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+/* Styling for when a note is missed */
+.note.missed-animation {
+    background-color: red;
+    opacity: 0.5;
+    transition: background-color 0.2s ease-out, opacity 0.2s ease-out;
+}
