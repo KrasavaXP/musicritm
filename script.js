@@ -3,12 +3,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const scoreElement = document.getElementById('score');
     const multiplierElement = document.getElementById('multiplier');
     const instrumentSelectElement = document.getElementById('instrument-select');
+    const gameContainerElement = document.getElementById('game-container'); // For Overdrive BG
+    const overdriveFillElement = document.getElementById('overdrive-fill');
     const tracks = [
         document.getElementById('track-1'),
         document.getElementById('track-2'),
         document.getElementById('track-3'),
         document.getElementById('track-4'),
     ];
+
+    // Overdrive Variables
+    let overdriveMeterValue = 0;
+    const OVERDRIVE_MAX_VALUE = 100;
+    const OVERDRIVE_FILL_PER_NOTE = 25; // Fill 1/4 of the meter
+    let isOverdriveActive = false;
+    let overdriveDepletionInterval = null;
+    const OVERDRIVE_DEPLETION_RATE = 10; // Deplete 10% per second (adjust for desired duration e.g. 10s)
+    const OVERDRIVE_ACTIVATION_KEY = ' '; // Spacebar
 
     let audioContext;
     let audioBuffer;
@@ -29,11 +40,27 @@ document.addEventListener('DOMContentLoaded', () => {
     const FLUX_THRESHOLD = 0.4; // Initial guess, needs tuning
     const MIN_TIME_BETWEEN_NOTES_MS = 200; // Minimum time between generated notes
 
-    // let noteGenerationInterval; // Will be replaced by Meyda
+    // Note: noteGenerationInterval related code is being removed as it's no longer used.
     let playButton; // Declare playButton here to access it in handleMusicFile
+
+    // --- Overdrive Display Update ---
+    function updateOverdriveDisplay() {
+        if (overdriveFillElement) {
+            overdriveFillElement.style.width = overdriveMeterValue + '%';
+        }
+    }
 
     // --- Audio Loading and Playback ---
     musicFileElement.addEventListener('change', handleMusicFile);
+
+    // Ensure AudioContext is resumed on user interaction (e.g., file selection or play button click)
+    function resumeAudioContext() {
+        if (audioContext && audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                console.log('AudioContext resumed successfully');
+            }).catch(e => console.error('Error resuming AudioContext:', e));
+        }
+    }
 
     function handleMusicFile(event) {
         if (event.target.files && event.target.files[0]) {
@@ -41,28 +68,31 @@ document.addEventListener('DOMContentLoaded', () => {
             const reader = new FileReader();
 
             reader.onload = function(e) {
-                // Ensure play button is disabled while loading new audio
                 if (playButton) {
                     playButton.disabled = true;
                     playButton.textContent = 'Loading Audio...';
                 }
                 if (!audioContext) {
                     audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                    console.log('AudioContext created. State:', audioContext.state);
                 }
+                resumeAudioContext(); // Attempt to resume if suspended
+
                 audioContext.decodeAudioData(e.target.result)
                     .then(buffer => {
                         audioBuffer = buffer;
-                        console.log('Audio loaded successfully');
-                        if (!playButton) { // Create button if it doesn't exist
+                        console.log('Audio decoded successfully. Buffer:', audioBuffer);
+                        if (!playButton) {
                            createPlayButton();
                         }
-                        playButton.disabled = false; // Enable button
+                        playButton.disabled = false;
                         playButton.textContent = 'Play Music';
                     })
                     .catch(error => {
                         console.error('Error decoding audio data:', error);
+                        audioBuffer = null; // Ensure buffer is null on error
                         if (playButton) {
-                            playButton.textContent = 'Load Failed'; // Keep disabled
+                            playButton.textContent = 'Load Failed';
                         }
                     });
             };
@@ -71,63 +101,66 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function createPlayButton() {
-        // playButton is already declared in the outer scope
-        if (!document.getElementById('play-music-button')) { // Check if it's already in DOM
+        if (!document.getElementById('play-music-button')) {
             playButton = document.createElement('button');
             playButton.id = 'play-music-button';
             playButton.textContent = 'Load Music First';
-            playButton.disabled = true; // Initially disabled
+            playButton.disabled = true;
             musicFileElement.parentElement.appendChild(playButton);
-            playButton.addEventListener('click', playMusic);
-        } else {
-            playButton = document.getElementById('play-music-button'); // Get existing one
-        }
-    }
-
-    function playMusic() {
-        if (audioBuffer && audioContext) {
-            if (audioSource) {
-                audioSource.stop();
-            }
-            audioSource = audioContext.createBufferSource();
-            audioSource.buffer = audioBuffer;
-            // Connect source to Meyda and destination
-            audioSource.connect(audioContext.destination);
-
-            // Initialize Meyda
-            if (typeof Meyda === "undefined") {
-                console.error("Meyda library not loaded!");
-                return;
-            }
-            
-            meyda = new Meyda({
-                audioContext: audioContext,
-                source: audioSource,
-                bufferSize: 512, // Standard buffer size
-                featureExtractors: ['spectralFlux', 'rms'], // Specify features
-                callback: (features) => {
-                    // Beat detection logic
-                    const currentTimeMs = audioContext.currentTime * 1000;
-                    if (features.spectralFlux > lastSpectralFlux + FLUX_THRESHOLD &&
-                        (currentTimeMs - lastNoteTimeMs) > MIN_TIME_BETWEEN_NOTES_MS) {
-                        
-                        console.log('Beat detected! Flux:', features.spectralFlux.toFixed(3), 'RMS:', features.rms.toFixed(3));
-                        // Generate note on a random track (0-3)
-                        generateNote(Math.floor(Math.random() * tracks.length)); 
-                        lastNoteTimeMs = currentTimeMs;
-                    }
-                    lastSpectralFlux = features.spectralFlux;
-                }
+            playButton.addEventListener('click', () => {
+                resumeAudioContext(); // Ensure context is active on play click
+                playMusic();
             });
-            
-            audioSource.start(0);
-            meyda.start(); // Start Meyda feature extraction
-            console.log('Music playback started with Meyda.');
-            // startNoteGeneration(); // Old method, replaced by Meyda callback
         } else {
-            console.log('No audio loaded to play.');
+            playButton = document.getElementById('play-music-button');
         }
     }
+
+    // This is the first, simpler playMusic function that should be REMOVED.
+    // function playMusic() {
+    //     if (audioBuffer && audioContext) {
+    //         if (audioSource) {
+    //             audioSource.stop();
+    //         }
+    //         audioSource = audioContext.createBufferSource();
+    //         audioSource.buffer = audioBuffer;
+    //         // Connect source to Meyda and destination
+    //         audioSource.connect(audioContext.destination);
+
+    //         // Initialize Meyda
+    //         if (typeof Meyda === "undefined") {
+    //             console.error("Meyda library not loaded!");
+    //             return;
+    //         }
+            
+    //         meyda = new Meyda({
+    //             audioContext: audioContext,
+    //             source: audioSource,
+    //             bufferSize: 512, // Standard buffer size
+    //             featureExtractors: ['spectralFlux', 'rms'], // Specify features
+    //             callback: (features) => {
+    //                 // Beat detection logic
+    //                 const currentTimeMs = audioContext.currentTime * 1000;
+    //                 if (features.spectralFlux > lastSpectralFlux + FLUX_THRESHOLD &&
+    //                     (currentTimeMs - lastNoteTimeMs) > MIN_TIME_BETWEEN_NOTES_MS) {
+                        
+    //                     console.log('Beat detected! Flux:', features.spectralFlux.toFixed(3), 'RMS:', features.rms.toFixed(3));
+    //                     // Generate note on a random track (0-3)
+    //                     generateNote(Math.floor(Math.random() * tracks.length)); 
+    //                     lastNoteTimeMs = currentTimeMs;
+    //                 }
+    //                 lastSpectralFlux = features.spectralFlux;
+    //             }
+    //         });
+            
+    //         audioSource.start(0);
+    //         meyda.start(); // Start Meyda feature extraction
+    //         console.log('Music playback started with Meyda.');
+    //         // startNoteGeneration(); // Old method, replaced by Meyda callback
+    //     } else {
+    //         console.log('No audio loaded to play.');
+    //     }
+    // }
 
     // --- Note Generation (Now driven by Meyda) ---
     // const NOTE_GENERATION_INTERVAL_MS = 1500; // No longer needed
@@ -142,12 +175,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const trackElement = tracks[trackNumber];
         const noteElement = document.createElement('div');
         noteElement.classList.add('note');
-        // Note starts at top:0 by default due to position:absolute in .track
-        // No need to set .style.bottom or .style.top here if that's the case.
-        // The old line: noteElement.style.bottom = (trackElement.clientHeight) + 'px';
-        // has been removed as it was commented out and notes are appended then transformed.
-        // If notes need to appear from *above* the track, this might need adjustment,
-        // but current transform logic assumes they start at top:0 of the track.
+
+        // Designate Overdrive Notes (20% chance)
+        if (Math.random() < 0.2) {
+            noteElement.classList.add('note-overdrive');
+        }
 
         trackElement.appendChild(noteElement);
 
@@ -195,96 +227,179 @@ document.addEventListener('DOMContentLoaded', () => {
         // console.log('Note generation started.'); // No longer relevant as a standalone process
     }
 
-    // function stopNoteGeneration() { // No longer needed as interval is removed
-        // clearInterval(noteGenerationInterval);
-        // console.log('Note generation stopped.');
+    // Removing startNoteGeneration as it's dead code.
+    // function startNoteGeneration() {
+    //     if (noteGenerationInterval) {
+    //         clearInterval(noteGenerationInterval);
+    //     }
+    //     noteGenerationInterval = setInterval(() => {
+    //         const randomTrack = Math.floor(Math.random() * tracks.length);
+    //         generateNote(randomTrack);
+    //     }, NOTE_GENERATION_INTERVAL_MS);
     // }
 
-    // Call this when audio stops or is paused
+
+    // Call this when audio stops or is paused (This function seems fine)
     function stopMeydaAndNotes() {
         if (meyda) {
             meyda.stop();
             console.log('Meyda stopped.');
         }
-        // Clear any existing notes on tracks if needed (optional)
-        tracks.forEach(track => {
-            // track.innerHTML = ''; // This would remove all notes instantly
-        });
+        // Optional: Clear notes
     }
 
-    // Modify playMusic to handle stopping previous Meyda instance
-    // And also to stop Meyda when audio ends
+    // This is the CONSOLIDATED and CORRECTED playMusic function
     function playMusic() {
-        if (audioBuffer && audioContext) {
-            if (audioSource) {
+        resumeAudioContext(); // Ensure context is active
+
+        if (!audioBuffer) {
+            console.error('No audio buffer available to play.');
+            playButton.textContent = 'Load Music First';
+            return;
+        }
+        if (!audioContext) {
+            console.error('AudioContext not initialized.');
+            playButton.textContent = 'Audio Error';
+            return;
+        }
+
+        console.log('Attempting to play music. AudioContext state:', audioContext.state);
+
+        if (audioSource) {
+            try {
                 audioSource.stop();
-                if (meyda) meyda.stop(); // Stop previous Meyda instance
+                console.log('Previous audioSource stopped.');
+            } catch (e) {
+                console.warn('Error stopping previous audioSource (might have already finished):', e);
             }
-            audioSource = audioContext.createBufferSource();
-            audioSource.buffer = audioBuffer;
-            audioSource.connect(audioContext.destination);
+        }
+        if (meyda) {
+            meyda.stop();
+            console.log('Previous Meyda instance stopped.');
+        }
 
-            if (typeof Meyda === "undefined") {
-                console.error("Meyda library not loaded!");
-                playButton.textContent = 'Meyda Error';
-                return;
-            }
-            
-            meyda = new Meyda({
-                audioContext: audioContext,
-                source: audioSource,
-                bufferSize: 512,
-                featureExtractors: ['spectralFlux', 'rms'],
-                callback: (features) => {
-                    const currentTimeMs = audioContext.currentTime * 1000;
-                    if (features.spectralFlux > lastSpectralFlux + FLUX_THRESHOLD &&
-                        (currentTimeMs - lastNoteTimeMs) > MIN_TIME_BETWEEN_NOTES_MS) {
-                        console.log('Beat! Flux:', features.spectralFlux.toFixed(3), 'RMS:', features.rms.toFixed(3), 'Track:', Math.floor(Math.random() * tracks.length));
-                        generateNote(Math.floor(Math.random() * tracks.length));
-                        lastNoteTimeMs = currentTimeMs;
-                    }
-                    lastSpectralFlux = features.spectralFlux;
+        audioSource = audioContext.createBufferSource();
+        console.log('New AudioBufferSourceNode created.');
+        audioSource.buffer = audioBuffer;
+        console.log('AudioBuffer assigned to source. Duration:', audioBuffer.duration.toFixed(2) + 's');
+
+        // Standard connection: source -> destination (for playback)
+        // Meyda analyzes the source in parallel.
+        audioSource.connect(audioContext.destination);
+        console.log('AudioSource connected to AudioContext.destination.');
+
+        if (typeof Meyda === "undefined") {
+            console.error("Meyda library not loaded!");
+            playButton.textContent = 'Meyda Error';
+            return;
+        }
+        
+        console.log('Initializing Meyda...');
+        meyda = new Meyda({
+            audioContext: audioContext,
+            source: audioSource, // Meyda receives the audio data from this source
+            bufferSize: 512,
+            featureExtractors: ['spectralFlux', 'rms'], // Specify features
+            callback: (features) => {
+                if (!features) {
+                    // console.warn('Meyda callback invoked with null features.');
+                    return;
                 }
-            });
-            
-            audioSource.onended = () => {
-                console.log("Audio source ended.");
-                if (meyda) meyda.stop();
-                // Potentially reset lastSpectralFlux and lastNoteTimeMs here if desired
-                lastSpectralFlux = 0;
-                lastNoteTimeMs = 0;
-            };
-
+                // console.log('Meyda features:', features); // Log raw features for debugging
+                const currentTimeMs = audioContext.currentTime * 1000;
+                if (features.spectralFlux > lastSpectralFlux + FLUX_THRESHOLD &&
+                    (currentTimeMs - lastNoteTimeMs) > MIN_TIME_BETWEEN_NOTES_MS) {
+                    console.log('Beat! Flux:', features.spectralFlux.toFixed(3), 'RMS:', features.rms.toFixed(3));
+                    generateNote(Math.floor(Math.random() * tracks.length));
+                    lastNoteTimeMs = currentTimeMs;
+                }
+                lastSpectralFlux = features.spectralFlux;
+            }
+        });
+        console.log('Meyda initialized. Source connected for analysis.');
+        
+        audioSource.onended = () => {
+            console.log("Audio source playback ended.");
+            if (meyda) {
+                meyda.stop();
+                console.log("Meyda stopped due to audio source end.");
+            }
+            playButton.textContent = 'Play Music'; // Reset button
+            lastSpectralFlux = 0;
+            lastNoteTimeMs = 0;
+        };
+        
+        try {
+            console.log('Starting audioSource.start(0)...');
             audioSource.start(0);
             meyda.start();
-            console.log('Music playback started with Meyda.');
-            playButton.textContent = 'Playing...'; // Update play button text
-        } else {
-            console.log('No audio loaded to play.');
-            playButton.textContent = 'Load Music First';
+            console.log('Meyda feature extraction started.');
+            playButton.textContent = 'Playing...';
+            console.log('Music playback initiated.');
+        } catch (e) {
+            console.error('Error starting audioSource:', e);
+            playButton.textContent = 'Playback Error';
         }
     }
 
-
     // --- User Input Handling ---
     const KEY_TO_TRACK = {
-        '1': 0, // Key '1' for Track 1
-        '2': 1, // Key '2' for Track 2
-        '3': 2, // Key '3' for Track 3
-        '4': 3  // Key '4' for Track 4
+        '1': 0, 'd': 0, // Key '1' or 'd' for Track 1
+        '2': 1, 'f': 1, // Key '2' or 'f' for Track 2
+        '3': 2, 'j': 2, // Key '3' or 'j' for Track 3
+        '4': 3, 'k': 3  // Key '4' or 'k' for Track 4
     };
 
     window.addEventListener('keydown', handleKeyPress);
 
     function handleKeyPress(event) {
-        const trackNumber = KEY_TO_TRACK[event.key];
+        // Handle Overdrive Activation
+        if (event.key === OVERDRIVE_ACTIVATION_KEY) {
+            if (overdriveMeterValue === OVERDRIVE_MAX_VALUE && !isOverdriveActive) {
+                activateOverdrive();
+            }
+            event.preventDefault(); // Prevent spacebar from scrolling page etc.
+            return;
+        }
+
+        const trackNumber = KEY_TO_TRACK[event.key.toLowerCase()];
         if (trackNumber !== undefined) {
-            // Visual feedback for key press
             tracks[trackNumber].classList.add('active');
             setTimeout(() => tracks[trackNumber].classList.remove('active'), 100);
-
             checkHit(trackNumber);
         }
+    }
+
+    // --- Overdrive Logic ---
+    function activateOverdrive() {
+        isOverdriveActive = true;
+        console.log("OVERDRIVE ACTIVATED!");
+        if (gameContainerElement) gameContainerElement.classList.add('overdrive-active-bg');
+        
+        // Start depletion
+        if (overdriveDepletionInterval) clearInterval(overdriveDepletionInterval); // Clear any existing
+        overdriveDepletionInterval = setInterval(depleteOverdrive, 1000); // Depletes every second
+        
+        updateScoreDisplay(); // Update multiplier display immediately
+    }
+
+    function depleteOverdrive() {
+        overdriveMeterValue -= OVERDRIVE_DEPLETION_RATE;
+        updateOverdriveDisplay();
+        if (overdriveMeterValue <= 0) {
+            deactivateOverdrive();
+        }
+    }
+
+    function deactivateOverdrive() {
+        isOverdriveActive = false;
+        overdriveMeterValue = 0; 
+        updateOverdriveDisplay();
+        if (overdriveDepletionInterval) clearInterval(overdriveDepletionInterval);
+        overdriveDepletionInterval = null;
+        console.log("OVERDRIVE DEACTIVATED!");
+        if (gameContainerElement) gameContainerElement.classList.remove('overdrive-active-bg');
+        updateScoreDisplay(); // Update multiplier display
     }
 
     // --- Hit/Miss Detection (Basic) ---
@@ -311,52 +426,68 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (noteBottomRelativeToTrack >= hittableLowerBound && noteBottomRelativeToTrack <= hittableUpperBound) {
                 console.log('Hit on track', trackNumber + 1);
-                note.classList.add('hit-animation'); // Add CSS animation class
-                setTimeout(() => note.remove(), 200); // Remove after animation
-                handleHit();
+                
+                // Check for Overdrive note hit
+                if (note.classList.contains('note-overdrive') && !isOverdriveActive) {
+                    overdriveMeterValue = Math.min(OVERDRIVE_MAX_VALUE, overdriveMeterValue + OVERDRIVE_FILL_PER_NOTE);
+                    updateOverdriveDisplay();
+                    console.log('Overdrive note hit! Meter:', overdriveMeterValue);
+                }
+
+                note.classList.add('hit-animation');
+                setTimeout(() => note.remove(), 200);
+                handleHit(); // Pass trackElement for hit feedback
                 hitOccurred = true;
                 
                 // Visual feedback for hit on track
                 trackElement.classList.add('hit');
                 setTimeout(() => trackElement.classList.remove('hit'), 100);
-                break; // Process only one hit per key press for now
+
+                break; 
             }
         }
 
-        if (!hitOccurred) {
-            // No note was in the hittable zone for that track press
-            // This is not necessarily a "miss" of a note, but a "mistimed press"
-            // Misses are handled when notes pass the zone or reach the bottom.
-            // However, some games penalize mistimed presses by resetting multiplier.
-            // For now, let's not penalize empty presses to be more lenient.
-            // console.log('Mistimed press on track', trackNumber + 1);
-        }
+        // No penalty for mistimed presses for now
     }
 
 
     // --- Score and Multiplier Update ---
     function updateScoreDisplay() {
         scoreElement.textContent = score;
-        multiplierElement.textContent = `${multiplier}x`;
+        let displayMultiplier = multiplier;
+        if (isOverdriveActive) {
+            displayMultiplier *= 2;
+        }
+        multiplierElement.textContent = `${displayMultiplier}x`;
     }
 
-    function handleHit() {
-        score += BASE_SCORE_PER_HIT * multiplier;
-        if (multiplier < MAX_MULTIPLIER) {
+    function handleHit() { // Now only updates score and base multiplier
+        let currentHitScore = BASE_SCORE_PER_HIT;
+        let actualMultiplier = multiplier;
+
+        if (isOverdriveActive) {
+            actualMultiplier *= 2;
+        }
+        score += currentHitScore * actualMultiplier;
+        
+        if (!isOverdriveActive && multiplier < MAX_MULTIPLIER) { // Multiplier only increases if Overdrive is NOT active
             multiplier++;
         }
         updateScoreDisplay();
     }
 
     function handleMiss() {
-        multiplier = 1;
+        multiplier = 1; // Reset base multiplier
+        if (isOverdriveActive) {
+            deactivateOverdrive(); // Deactivate Overdrive on miss
+        }
         updateScoreDisplay();
-        // Add visual feedback for a miss if desired (e.g., screen flash red)
     }
 
     // Initialize display
     updateScoreDisplay();
-    createPlayButton(); // Create the play button on initial load (will be disabled)
+    updateOverdriveDisplay(); // Initial call for Overdrive meter
+    createPlayButton(); 
 
     // --- Instrument Selection ---
     instrumentSelectElement.addEventListener('change', (event) => {

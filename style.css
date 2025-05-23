@@ -29,6 +29,7 @@ header {
 #score-section, #multiplier-section {
     font-size: 1.2em;
     font-weight: bold;
+    align-items: center; /* Align items vertically in header sections */
 }
 
 #score {
@@ -38,6 +39,44 @@ header {
 #multiplier {
     color: #FFC107;
 }
+
+/* Overdrive Styles */
+#overdrive-section {
+    font-size: 1.2em;
+    font-weight: bold;
+    display: flex; /* For aligning text and meter */
+    align-items: center;
+}
+
+#overdrive-meter {
+    width: 100px;
+    height: 12px;
+    background-color: #555;
+    border: 1px solid #333;
+    border-radius: 3px;
+    margin-left: 8px; /* Space between "Overdrive:" text and meter */
+    overflow: hidden; /* To contain the fill */
+}
+
+#overdrive-fill {
+    width: 0%; /* Initial fill */
+    height: 100%;
+    background-color: #00ccff; /* Bright blue for Overdrive */
+    box-shadow: 0 0 5px #00ccff, 0 0 10px #00ccff; /* Glow effect */
+    transition: width 0.2s ease-out;
+}
+
+.note-overdrive {
+    background-color: gold !important; /* Make Overdrive notes distinct */
+    border: 2px solid #fff700 !important;
+    box-shadow: 0 0 10px gold, 0 0 15px #fff700; /* Glow for Overdrive notes */
+}
+
+.overdrive-active-bg {
+    box-shadow: 0 0 25px 10px gold, 0 0 35px 15px #fff700 !important; /* Intense glow for game container */
+    border: 2px solid gold !important;
+}
+
 
 #music-selection, #instrument-selection {
     margin-bottom: 20px;
@@ -53,72 +92,122 @@ header {
     border: 1px solid #ccc;
 }
 
-#visual-tracks {
+/* New styles for 3D perspective */
+#game-area {
+    perspective: 1000px; /* Adjust value as needed */
+    perspective-origin: 50% 150px; /* Adjust vanishing point (e.g., top of tracks) */
+    padding: 20px; /* Add some padding so rotated elements don't get cut off */
+    background-color: #2c3e50; /* Darker background for contrast */
+    border-radius: 10px;
+    margin-top: 30px; /* Give some space from elements above */
+}
+
+#visual-tracks { /* This is the tracks-container */
     display: flex;
     justify-content: space-around;
-    height: 400px; /* Adjust as needed */
-    border: 2px solid #333;
-    border-radius: 5px;
+    height: 500px; /* Increased height for more receding effect */
+    /* border: 2px solid #333; */ /* Optional: can remove for cleaner look */
+    /* border-radius: 5px; */
     padding: 10px;
-    background-color: #ddd;
+    /* background-color: #ddd; */ /* Can be transparent or match game-area */
+    position: relative; /* Needed for transform-style and children positioning */
+
+    transform-style: preserve-3d;
+    transform: rotateX(50deg) translateY(-50px) translateZ(-100px); /* Adjust angles and positions */
+    /* Example: translateY to pull tracks "down", translateZ to push "further" */
 }
 
 .track {
-    width: 100px; /* Adjust as needed */
-    background-color: #555;
-    border-radius: 5px;
-    margin: 0 5px;
-    position: relative; /* For positioning notes */
-    overflow: hidden; /* To hide notes overflowing */
+    width: 120px; /* Slightly wider tracks */
+    background-color: rgba(85, 85, 85, 0.7); /* Semi-transparent tracks */
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 10px; /* Rounded corners for tracks */
+    margin: 0 10px; /* Increased margin */
+    position: relative; 
+    overflow: hidden; 
+    transform-style: preserve-3d; /* So notes within tracks are also in 3D space */
+    box-shadow: 0px 10px 15px rgba(0,0,0,0.3); /* Add some shadow for depth */
+
+    /* Optional: if tracks themselves need individual 3D adjustments */
+    /* transform: translateZ(0px); */ 
 }
 
-/* Styling for each track to be visually distinct */
-#track-1 { background-color: #ff7675; } /* Light Red */
-#track-2 { background-color: #74b9ff; } /* Light Blue */
-#track-3 { background-color: #55efc4; } /* Light Green */
-#track-4 { background-color: #ffeaa7; } /* Light Yellow */
+/* Styling for each track to be visually distinct - adjust opacity if needed */
+#track-1 { background-color: rgba(255, 118, 117, 0.7); } /* Light Red */
+#track-2 { background-color: rgba(116, 185, 255, 0.7); } /* Light Blue */
+#track-3 { background-color: rgba(85, 239, 196, 0.7); } /* Light Green */
+#track-4 { background-color: rgba(255, 234, 167, 0.7); } /* Light Yellow */
 
 /* Placeholder styling for notes */
 .note {
     width: 80%;
-    height: 30px; /* Adjust as needed */
-    background-color: #333;
+    height: 30px; 
+    background-color: #2c3e50; /* Darker notes for contrast on lighter tracks */
     border: 2px solid #fff;
     border-radius: 5px;
     position: absolute;
-    /* bottom: 10px; */ /* Controlled by JS or default top:0 */
     left: 10%;
-    /* animation: fall 5s linear infinite; */ /* Animation is handled by JS */
+    /* The 'bottom' or 'top' will be controlled by JS for falling animation */
+    /* transform: translateY(0) translateZ(0); */ /* Initial Z position for notes if needed */
+    /* Ensure notes are rendered correctly in 3D space */
+    transform-style: preserve-3d; /* If notes have 3D children, which they don't now */
 }
 
-/* Example animation for falling notes - This is not used by default, JS handles animation */
-/* @keyframes fall {
-    0% { transform: translateY(0); }
-    100% { transform: translateY(-400px); } /* Adjust to track height */
+/* Example animation for falling notes - This is not used by default, JS handles animation.
+   The JS animation `translateY` will now operate within the transformed track.
+*/
+/* @keyframes fall { */
+    /* 0% { transform: translateY(0); } */
+    /* 100% { transform: translateY(-400px); } */ /* Adjust to track height */
 /* } */
 
 /* Basic styling for key press feedback */
+/* The existing transform: scale(1.05) on .track.active might look odd in 3D.
+   Consider adjusting or using a different feedback, like changing opacity or border.
+*/
 .track.active {
-    box-shadow: 0 0 15px 5px #fff; /* Highlight effect */
-    transform: scale(1.05); /* Slightly larger */
-    transition: box-shadow 0.1s ease-out, transform 0.1s ease-out;
+    /* box-shadow: 0 0 20px 8px #0ff; */ /* Cyan glow for active */
+    border-color: #0ff;
+    transform: scale(1.02) translateZ(5px); /* Slight pop-out effect */
+    transition: transform 0.1s ease-out, border-color 0.1s ease-out;
 }
 
 .track.hit {
-    background-color: #fff; /* Flash white on hit */
+    background-color: rgba(255, 255, 255, 0.9); /* Brighter flash on hit */
     transition: background-color 0.05s ease-out;
 }
 
 /* Styling for when a note is successfully hit */
+/* Note hit animation might need translateZ if notes are on different Z planes */
 .note.hit-animation {
     opacity: 0;
-    transform: scale(1.5);
+    transform: scale(1.5) translateZ(10px); /* Example: move slightly forward and scale */
     transition: opacity 0.2s ease-out, transform 0.2s ease-out;
 }
 
 /* Styling for when a note is missed */
 .note.missed-animation {
-    background-color: red;
+    background-color: rgba(255, 0, 0, 0.7); /* Semi-transparent red */
     opacity: 0.5;
     transition: background-color 0.2s ease-out, opacity 0.2s ease-out;
+}
+
+/* Hit Zone Visual Indication (Placeholder - adjust based on game design)
+   This will be a visual guide at the bottom of the tracks.
+   Its exact position and styling will depend on the final 3D track angle.
+*/
+#game-area::after { /* Using ::after on game-area to place it relative to perspective container */
+    content: '';
+    position: absolute;
+    bottom: 60px; /* Adjust based on #visual-tracks transform and desired hit line position */
+    left: 5%; /* Align with track area */
+    width: 90%;
+    height: 10px;
+    background-color: rgba(255, 255, 255, 0.3); /* Translucent white line */
+    border-radius: 5px;
+    /* This element is NOT in 3D space of the tracks, it's a 2D overlay.
+       If a 3D hitzone is needed, it should be inside #visual-tracks.
+       For now, this is a simpler 2D line.
+    */
+    z-index: 10; /* Ensure it's visible */
 }
