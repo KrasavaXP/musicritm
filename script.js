@@ -43,6 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // Note: noteGenerationInterval related code is being removed as it's no longer used.
     let playButton; // Declare playButton here to access it in handleMusicFile
 
+    // Ensure audioBuffer is initialized to null
+    audioBuffer = null;
+
     // --- Overdrive Display Update ---
     function updateOverdriveDisplay() {
         if (overdriveFillElement) {
@@ -53,51 +56,95 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Audio Loading and Playback ---
     musicFileElement.addEventListener('change', handleMusicFile);
 
-    // Ensure AudioContext is resumed on user interaction (e.g., file selection or play button click)
+    // Ensure AudioContext is resumed on user interaction
     function resumeAudioContext() {
-        if (audioContext && audioContext.state === 'suspended') {
-            audioContext.resume().then(() => {
-                console.log('AudioContext resumed successfully');
-            }).catch(e => console.error('Error resuming AudioContext:', e));
+        if (!audioContext) { // Initialize AudioContext if it doesn't exist
+            try {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                console.log('AudioContext created. Initial state:', audioContext.state);
+            } catch (e) {
+                console.error("Error creating AudioContext:", e);
+                if(playButton) playButton.textContent = "Audio API Error";
+                return false; // Indicate failure
+            }
         }
+        if (audioContext.state === 'suspended') {
+            audioContext.resume().then(() => {
+                console.log('AudioContext resumed successfully. State:', audioContext.state);
+            }).catch(e => {
+                console.error('Error resuming AudioContext:', e);
+                if(playButton) playButton.textContent = "Audio Resume Err";
+            });
+        }
+        return true; // Indicate success or already running
     }
 
     function handleMusicFile(event) {
-        if (event.target.files && event.target.files[0]) {
-            const file = event.target.files[0];
-            const reader = new FileReader();
-
-            reader.onload = function(e) {
-                if (playButton) {
-                    playButton.disabled = true;
-                    playButton.textContent = 'Loading Audio...';
-                }
-                if (!audioContext) {
-                    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-                    console.log('AudioContext created. State:', audioContext.state);
-                }
-                resumeAudioContext(); // Attempt to resume if suspended
-
-                audioContext.decodeAudioData(e.target.result)
-                    .then(buffer => {
-                        audioBuffer = buffer;
-                        console.log('Audio decoded successfully. Buffer:', audioBuffer);
-                        if (!playButton) {
-                           createPlayButton();
-                        }
-                        playButton.disabled = false;
-                        playButton.textContent = 'Play Music';
-                    })
-                    .catch(error => {
-                        console.error('Error decoding audio data:', error);
-                        audioBuffer = null; // Ensure buffer is null on error
-                        if (playButton) {
-                            playButton.textContent = 'Load Failed';
-                        }
-                    });
-            };
-            reader.readAsArrayBuffer(file);
+        const file = event.target.files[0];
+        if (!file) {
+            console.log("No file selected");
+            // If a file was previously loaded, playButton might be enabled.
+            // Optionally, disable it or reset text if no file is chosen.
+            // For now, we assume this event only fires if a file *is* selected.
+            return;
         }
+
+        if (!playButton) { // Ensure playButton is available
+            createPlayButton(); 
+        }
+        playButton.disabled = true;
+        playButton.textContent = "Loading audio...";
+
+        const reader = new FileReader();
+
+        reader.onload = function(e) {
+            console.log("FileReader onload triggered. ArrayBuffer length:", e.target.result.byteLength);
+            if (!resumeAudioContext()) { // Ensure AudioContext is ready before decoding
+                audioBuffer = null;
+                if(playButton) playButton.textContent = "Audio Ctx Error";
+                return;
+            }
+            decodeAudio(e.target.result); 
+        };
+
+        reader.onerror = function(e) {
+            console.error("FileReader error:", e);
+            if (playButton) {
+                playButton.disabled = false; // Re-enable to allow another file selection attempt
+                playButton.textContent = "File Read Error";
+            }
+            audioBuffer = null; 
+        };
+
+        reader.readAsArrayBuffer(file);
+    }
+
+    function decodeAudio(arrayBuffer) {
+        console.log("Attempting to decode audio data...");
+        // The decodeAudioData success and error callbacks are the old way.
+        // The Promise-based way is preferred and was already in use.
+        // Reverting to callbacks as per instruction, but noting this.
+        audioContext.decodeAudioData(arrayBuffer, 
+            function(buffer) { // Success callback
+                console.log("Audio decoding successful. AudioBuffer:", buffer);
+                console.log("Duration:", buffer.duration.toFixed(2) + "s", 
+                            "Channels:", buffer.numberOfChannels, 
+                            "Sample Rate:", buffer.sampleRate);
+                audioBuffer = buffer; 
+                if (playButton) {
+                    playButton.disabled = false; 
+                    playButton.textContent = "Play Music"; 
+                }
+            }, 
+            function(error) { // Error callback
+                console.error("Error decoding audio data:", error);
+                if (playButton) {
+                    playButton.disabled = false; 
+                    playButton.textContent = "Decode Error";
+                }
+                audioBuffer = null; 
+            }
+        );
     }
 
     function createPlayButton() {
@@ -254,28 +301,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (!audioBuffer) {
             console.error('No audio buffer available to play.');
-            playButton.textContent = 'Load Music First';
+            if(playButton) playButton.textContent = 'Load Music First';
             return;
         }
         if (!audioContext) {
             console.error('AudioContext not initialized.');
-            playButton.textContent = 'Audio Error';
+            if(playButton) playButton.textContent = 'Audio Error';
             return;
         }
 
         console.log('Attempting to play music. AudioContext state:', audioContext.state);
 
+        // Stop any existing audio source and Meyda instance
         if (audioSource) {
             try {
                 audioSource.stop();
                 console.log('Previous audioSource stopped.');
             } catch (e) {
-                console.warn('Error stopping previous audioSource (might have already finished):', e);
+                console.warn('Error stopping previous audioSource:', e);
             }
+            // audioSource.disconnect(); // Disconnecting might be premature if Meyda is also using it
         }
         if (meyda) {
-            meyda.stop();
-            console.log('Previous Meyda instance stopped.');
+            try {
+                meyda.stop();
+                console.log('Previous Meyda instance stopped.');
+            } catch (e) {
+                 console.warn('Error stopping previous Meyda instance:', e);
+            }
         }
 
         audioSource = audioContext.createBufferSource();
@@ -283,85 +336,110 @@ document.addEventListener('DOMContentLoaded', () => {
         audioSource.buffer = audioBuffer;
         console.log('AudioBuffer assigned to source. Duration:', audioBuffer.duration.toFixed(2) + 's');
 
-        // Standard connection: source -> destination (for playback)
-        // Meyda analyzes the source in parallel.
+        // Connect audioSource to destination for playback
         audioSource.connect(audioContext.destination);
         console.log('AudioSource connected to AudioContext.destination.');
 
-        // Step 1: Verify Meyda Library Loaded
+        // 1. Ensure Meyda Library Check
         if (typeof Meyda === 'undefined') {
             console.error("Meyda library is not loaded!");
-            playButton.textContent = "Meyda Load Error"; // Updated button text
+            if(playButton) playButton.textContent = "Meyda Load Error";
+            // Clean up: stop the source if it was about to play without Meyda
+            if (audioSource) { try { audioSource.stop(); } catch (se) {} }
             return;
         }
         
-        // Step 2: Review Meyda Initialization (audioContext and audioSource should be valid here based on prior checks)
-        console.log('Initializing Meyda...');
+        // 2. Initialize Meyda
+        console.log("Initializing Meyda...");
         try {
             meyda = new Meyda({
                 audioContext: audioContext,
-                source: audioSource, 
-                bufferSize: 512,
-                featureExtractors: ['spectralFlux', 'rms'], 
-                callback: (features) => {
-                    if (!features) {
-                        return;
-                    }
-                    const currentTimeMs = audioContext.currentTime * 1000;
-                    if (features.spectralFlux > lastSpectralFlux + FLUX_THRESHOLD &&
-                        (currentTimeMs - lastNoteTimeMs) > MIN_TIME_BETWEEN_NOTES_MS) {
-                        console.log('Beat! Flux:', features.spectralFlux.toFixed(3), 'RMS:', features.rms.toFixed(3));
-                        generateNote(Math.floor(Math.random() * tracks.length));
-                        lastNoteTimeMs = currentTimeMs;
-                    }
-                    lastSpectralFlux = features.spectralFlux;
-                }
+                source: audioSource, // The AudioBufferSourceNode that IS connected to destination
+                bufferSize: 512, 
+                featureExtractors: ['spectralFlux', 'rms'],
+                callback: meydaCallback // Ensure this function exists
             });
-            console.log("Meyda instance created successfully.");
+            console.log("Meyda instance created.");
         } catch (e) {
             console.error("Error creating Meyda instance:", e);
-            playButton.textContent = "Meyda Init Error"; // Updated button text
-            return; // Stop further execution if Meyda fails to initialize
+            if(playButton) playButton.textContent = "Meyda Init Error";
+            if (audioSource) { try { audioSource.stop(); } catch (se) {} } // Stop audio if Meyda fails
+            return;
         }
         
+        // 3. Set up onended handler for audioSource
         audioSource.onended = () => {
-            console.log("Audio source playback ended.");
+            console.log("Audio playback finished.");
             if (meyda) {
                 try {
                     meyda.stop();
-                    console.log("Meyda stopped due to audio source end.");
+                    console.log("Meyda stopped.");
                 } catch (e) {
                     console.error("Error stopping Meyda on audio end:", e);
                 }
             }
-            playButton.textContent = 'Play Music'; 
-            lastSpectralFlux = 0;
-            lastNoteTimeMs = 0;
+            if(playButton) {
+                playButton.disabled = false;
+                playButton.textContent = "Play Music";
+            }
+            lastSpectralFlux = 0; // Reset for next playback
+            lastNoteTimeMs = 0;  // Reset for next playback
         };
         
+        // 4. Start audioSource and Meyda
         try {
             console.log('Starting audioSource.start(0)...');
-            audioSource.start(0); // Start audio playback
+            audioSource.start(0); 
             console.log('AudioSource started.');
 
-            if (meyda) { // Check if Meyda instance was successfully created
-                meyda.start(); // Start Meyda feature extraction
-                console.log("Meyda started successfully.");
-            }
-            playButton.textContent = 'Playing...';
-            console.log('Music playback initiated.');
-        } catch (e) {
-            console.error('Error starting audioSource or Meyda:', e);
-            playButton.textContent = 'Playback/Meyda Start Error'; // General error for this block
-            // Attempt to stop Meyda if it was started before an error in audioSource.start() or vice-versa (though less likely here)
-            if (meyda && typeof meyda.stop === 'function') {
+            if (meyda) { // Meyda instance should exist if we reached here
                 try {
-                    meyda.stop();
-                } catch (stopErr) {
-                    console.error('Nested error stopping Meyda after start error:', stopErr);
+                    meyda.start();
+                    console.log("Meyda started.");
+                } catch (e) {
+                    console.error("Error starting Meyda:", e);
+                    if(playButton) playButton.textContent = "Meyda Start Error";
+                    // audioSource is already started, its onended will handle cleanup.
                 }
             }
+            if(playButton) {
+                playButton.disabled = true; // Disable while playing
+                playButton.textContent = "Playing..."; 
+            }
+            console.log('Music playback with Meyda initiated.');
+        } catch (e) {
+            console.error('Error starting audioSource:', e);
+            if(playButton) {
+                playButton.disabled = false; // Re-enable on error
+                playButton.textContent = 'Playback Error';
+            }
+            // Attempt to stop Meyda if it was somehow started before audioSource error
+            if (meyda && typeof meyda.stop === 'function') {
+                try { meyda.stop(); } catch (stopErr) { console.error('Nested error stopping Meyda after start error:', stopErr); }
+            }
         }
+    }
+
+    // 3. Verify meydaCallback(features) Function
+    function meydaCallback(features) {
+        if (!features) {
+            // console.warn('Meyda callback invoked with null features.'); // Can be too noisy
+            return;
+        }
+        // Optional: Log raw features for detailed debugging if needed
+        // console.log('Meyda Features - Flux:', features.spectralFlux.toFixed(4), 'RMS:', features.rms.toFixed(4));
+        
+        const currentTimeMs = audioContext.currentTime * 1000;
+        if (features.spectralFlux > lastSpectralFlux + FLUX_THRESHOLD &&
+            (currentTimeMs - lastNoteTimeMs) > MIN_TIME_BETWEEN_NOTES_MS) {
+            
+            // Add Console Log for Beat Detection
+            console.log("Beat detected! Spectral Flux:", parseFloat(features.spectralFlux.toFixed(4)), "RMS:", parseFloat(features.rms.toFixed(4)), "Time:", currentTimeMs.toFixed(0));
+            
+            generateNote(Math.floor(Math.random() * tracks.length));
+            lastNoteTimeMs = currentTimeMs; // Correctly updated
+        }
+        lastSpectralFlux = features.spectralFlux; // Correctly updated
     }
 
     // --- User Input Handling ---

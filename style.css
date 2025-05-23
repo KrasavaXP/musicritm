@@ -91,7 +91,7 @@ main { /* Container for music selection and game area */
     align-items: center;
     width: 100%;
     flex-grow: 1; /* Allow main to take remaining vertical space */
-    overflow: hidden; /* Prevent internal scrollbars if content overflows due to transforms */
+    /* overflow: hidden; */ /* TEMP: Disable to see if tracks are outside bounds */
     padding: 10px 0;
 }
 
@@ -153,7 +153,8 @@ main { /* Container for music selection and game area */
     border-radius: 10px; /* Rounded corners for tracks */
     margin: 0 10px; /* Increased margin */
     position: relative; 
-    overflow: hidden; 
+    /* overflow: hidden; */ /* TEMP: Disable to see if tracks themselves are being clipped */
+    height: 100%; /* Ensure tracks take full height of visual-tracks container */
     transform-style: preserve-3d; /* So notes within tracks are also in 3D space */
     box-shadow: 0px 10px 15px rgba(0,0,0,0.3); /* Add some shadow for depth */
 
