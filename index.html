@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhythm Game</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/meyda@latest/dist/meyda.min.js"></script>
+</head>
+<body>
+    <div id="game-container">
+        <header>
+            <div id="score-section">
+                Score: <span id="score">0</span>
+            </div>
+            <div id="multiplier-section">
+                Multiplier: <span id="multiplier">1x</span>
+            </div>
+        </header>
+
+        <main>
+            <div id="music-selection">
+                <label for="music-file">Select Music:</label>
+                <input type="file" id="music-file" accept="audio/*">
+            </div>
+
+            <div id="instrument-selection">
+                <label for="instrument-select">Select Instrument:</label>
+                <select id="instrument-select">
+                    <option value="vocals">Vocals</option>
+                    <option value="bass">Bass</option>
+                    <option value="keyboard">Keyboard</option>
+                    <option value="drums">Drums</option>
+                </select>
+            </div>
+
+            <div id="visual-tracks">
+                <div class="track" id="track-1"></div>
+                <div class="track" id="track-2"></div>
+                <div class="track" id="track-3"></div>
+                <div class="track" id="track-4"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
