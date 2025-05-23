@@ -288,57 +288,79 @@ document.addEventListener('DOMContentLoaded', () => {
         audioSource.connect(audioContext.destination);
         console.log('AudioSource connected to AudioContext.destination.');
 
-        if (typeof Meyda === "undefined") {
-            console.error("Meyda library not loaded!");
-            playButton.textContent = 'Meyda Error';
+        // Step 1: Verify Meyda Library Loaded
+        if (typeof Meyda === 'undefined') {
+            console.error("Meyda library is not loaded!");
+            playButton.textContent = "Meyda Load Error"; // Updated button text
             return;
         }
         
+        // Step 2: Review Meyda Initialization (audioContext and audioSource should be valid here based on prior checks)
         console.log('Initializing Meyda...');
-        meyda = new Meyda({
-            audioContext: audioContext,
-            source: audioSource, // Meyda receives the audio data from this source
-            bufferSize: 512,
-            featureExtractors: ['spectralFlux', 'rms'], // Specify features
-            callback: (features) => {
-                if (!features) {
-                    // console.warn('Meyda callback invoked with null features.');
-                    return;
+        try {
+            meyda = new Meyda({
+                audioContext: audioContext,
+                source: audioSource, 
+                bufferSize: 512,
+                featureExtractors: ['spectralFlux', 'rms'], 
+                callback: (features) => {
+                    if (!features) {
+                        return;
+                    }
+                    const currentTimeMs = audioContext.currentTime * 1000;
+                    if (features.spectralFlux > lastSpectralFlux + FLUX_THRESHOLD &&
+                        (currentTimeMs - lastNoteTimeMs) > MIN_TIME_BETWEEN_NOTES_MS) {
+                        console.log('Beat! Flux:', features.spectralFlux.toFixed(3), 'RMS:', features.rms.toFixed(3));
+                        generateNote(Math.floor(Math.random() * tracks.length));
+                        lastNoteTimeMs = currentTimeMs;
+                    }
+                    lastSpectralFlux = features.spectralFlux;
                 }
-                // console.log('Meyda features:', features); // Log raw features for debugging
-                const currentTimeMs = audioContext.currentTime * 1000;
-                if (features.spectralFlux > lastSpectralFlux + FLUX_THRESHOLD &&
-                    (currentTimeMs - lastNoteTimeMs) > MIN_TIME_BETWEEN_NOTES_MS) {
-                    console.log('Beat! Flux:', features.spectralFlux.toFixed(3), 'RMS:', features.rms.toFixed(3));
-                    generateNote(Math.floor(Math.random() * tracks.length));
-                    lastNoteTimeMs = currentTimeMs;
-                }
-                lastSpectralFlux = features.spectralFlux;
-            }
-        });
-        console.log('Meyda initialized. Source connected for analysis.');
+            });
+            console.log("Meyda instance created successfully.");
+        } catch (e) {
+            console.error("Error creating Meyda instance:", e);
+            playButton.textContent = "Meyda Init Error"; // Updated button text
+            return; // Stop further execution if Meyda fails to initialize
+        }
         
         audioSource.onended = () => {
             console.log("Audio source playback ended.");
             if (meyda) {
-                meyda.stop();
-                console.log("Meyda stopped due to audio source end.");
+                try {
+                    meyda.stop();
+                    console.log("Meyda stopped due to audio source end.");
+                } catch (e) {
+                    console.error("Error stopping Meyda on audio end:", e);
+                }
             }
-            playButton.textContent = 'Play Music'; // Reset button
+            playButton.textContent = 'Play Music'; 
             lastSpectralFlux = 0;
             lastNoteTimeMs = 0;
         };
         
         try {
             console.log('Starting audioSource.start(0)...');
-            audioSource.start(0);
-            meyda.start();
-            console.log('Meyda feature extraction started.');
+            audioSource.start(0); // Start audio playback
+            console.log('AudioSource started.');
+
+            if (meyda) { // Check if Meyda instance was successfully created
+                meyda.start(); // Start Meyda feature extraction
+                console.log("Meyda started successfully.");
+            }
             playButton.textContent = 'Playing...';
             console.log('Music playback initiated.');
         } catch (e) {
-            console.error('Error starting audioSource:', e);
-            playButton.textContent = 'Playback Error';
+            console.error('Error starting audioSource or Meyda:', e);
+            playButton.textContent = 'Playback/Meyda Start Error'; // General error for this block
+            // Attempt to stop Meyda if it was started before an error in audioSource.start() or vice-versa (though less likely here)
+            if (meyda && typeof meyda.stop === 'function') {
+                try {
+                    meyda.stop();
+                } catch (stopErr) {
+                    console.error('Nested error stopping Meyda after start error:', stopErr);
+                }
+            }
         }
     }
 
