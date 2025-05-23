@@ -315,14 +315,17 @@ document.addEventListener('DOMContentLoaded', () => {
         // Stop any existing audio source and Meyda instance
         if (audioSource) {
             try {
-                audioSource.stop();
-                console.log('Previous audioSource stopped.');
+                audioSource.onended = null; // Remove previous onended handler immediately
+                audioSource.stop(0);      // Stop it if it's somehow still playing
             } catch (e) {
-                console.warn('Error stopping previous audioSource:', e);
+                // console.warn("Error stopping previous audio source:", e); // Optional: log if needed
             }
-            // audioSource.disconnect(); // Disconnecting might be premature if Meyda is also using it
+            audioSource.disconnect();   // Disconnect from all nodes
+            audioSource = null;         // Explicitly nullify
+            console.log("Previous audioSource stopped, disconnected, and nulled.");
         }
-        if (meyda) {
+
+        if (meyda) { // Also ensure Meyda is stopped if it was running
             try {
                 meyda.stop();
                 console.log('Previous Meyda instance stopped.');
